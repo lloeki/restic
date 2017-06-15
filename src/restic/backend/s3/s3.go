@@ -157,6 +157,16 @@ func (be *Backend) Path() string {
 	return be.prefix
 }
 
+// nopFileCloser is a wrapper around *os.File with a Close() function that does
+// nothing.
+type nopFileCloser struct {
+	*os.File
+}
+
+func (nopFileCloser) Close() error {
+	return nil
+}
+
 // Save stores data in the backend at the handle.
 func (be *Backend) Save(ctx context.Context, h restic.Handle, rd io.Reader) (err error) {
 	debug.Log("Save %v", h)
@@ -172,6 +182,11 @@ func (be *Backend) Save(ctx context.Context, h restic.Handle, rd io.Reader) (err
 	if err == nil {
 		debug.Log("%v already exists", h)
 		return errors.New("key already exists")
+	}
+
+	// prevent that the file can be closed
+	if f, ok := rd.(*os.File); ok {
+		rd = nopFileCloser{File: f}
 	}
 
 	be.sem.GetToken()
